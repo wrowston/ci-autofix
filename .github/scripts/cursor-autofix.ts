@@ -53,8 +53,8 @@ const repoConfig = context.prUrl
   : { url: context.repoUrl, startingRef: context.failedRef };
 
 if (
-  context.eventName === "workflow_run" &&
   context.workflowAllowlist.length > 0 &&
+  context.workflowName !== "manual dispatch" &&
   !context.workflowAllowlist.includes(context.workflowName)
 ) {
   console.log(`Skipping Cursor autofix for workflow "${context.workflowName}".`);
