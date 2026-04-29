@@ -23,34 +23,42 @@ const splitList = (value: string | undefined) =>
 
 const formatList = (items: string[]) => items.map((item) => `- ${item}`).join("\n");
 
-const repository = requiredEnv("GITHUB_REPOSITORY");
-const githubSha = requiredEnv("GITHUB_SHA");
-const githubRunId = requiredEnv("GITHUB_RUN_ID");
-const githubRunAttempt = optionalEnv("GITHUB_RUN_ATTEMPT") ?? "1";
-const githubRefName = optionalEnv("GITHUB_REF_NAME") ?? "unknown";
-const githubEventName = optionalEnv("GITHUB_EVENT_NAME") ?? "unknown";
-const failedRef = optionalEnv("FAILED_REF") ?? githubSha;
-const failedBranch = optionalEnv("FAILED_BRANCH") ?? githubRefName;
-const workflowName = optionalEnv("WORKFLOW_NAME") ?? "manual dispatch";
-const workflowConclusion = optionalEnv("WORKFLOW_CONCLUSION") ?? "unknown";
-const workflowAllowlist = splitList(optionalEnv("CURSOR_AUTOFIX_WORKFLOWS"));
-const prUrl = optionalEnv("PR_URL");
-const currentWorkflowUrl = `https://github.com/${repository}/actions/runs/${githubRunId}/attempts/${githubRunAttempt}`;
-const workflowUrl = optionalEnv("WORKFLOW_URL") ?? currentWorkflowUrl;
-const repoUrl = `https://github.com/${repository}`;
-const dryRun = optionalEnv("CURSOR_AUTOFIX_DRY_RUN") === "true";
+const context = (() => {
+  const repository = requiredEnv("GITHUB_REPOSITORY");
+  const githubSha = requiredEnv("GITHUB_SHA");
+  const githubRunId = requiredEnv("GITHUB_RUN_ID");
+  const githubRunAttempt = optionalEnv("GITHUB_RUN_ATTEMPT") ?? "1";
+  const githubRefName = optionalEnv("GITHUB_REF_NAME") ?? "unknown";
+  const repoUrl = `https://github.com/${repository}`;
 
-const repoConfig = prUrl
-  ? { url: repoUrl, prUrl }
-  : { url: repoUrl, startingRef: failedRef };
+  return {
+    repository,
+    repoUrl,
+    eventName: optionalEnv("GITHUB_EVENT_NAME") ?? "unknown",
+    failedRef: optionalEnv("FAILED_REF") ?? githubSha,
+    failedBranch: optionalEnv("FAILED_BRANCH") ?? githubRefName,
+    workflowName: optionalEnv("WORKFLOW_NAME") ?? "manual dispatch",
+    workflowConclusion: optionalEnv("WORKFLOW_CONCLUSION") ?? "unknown",
+    workflowAllowlist: splitList(optionalEnv("CURSOR_AUTOFIX_WORKFLOWS")),
+    workflowUrl:
+      optionalEnv("WORKFLOW_URL") ??
+      `${repoUrl}/actions/runs/${githubRunId}/attempts/${githubRunAttempt}`,
+    prUrl: optionalEnv("PR_URL"),
+    dryRun: optionalEnv("CURSOR_AUTOFIX_DRY_RUN") === "true",
+  };
+})();
+
+const repoConfig = context.prUrl
+  ? { url: context.repoUrl, prUrl: context.prUrl }
+  : { url: context.repoUrl, startingRef: context.failedRef };
 
 if (
-  githubEventName === "workflow_run" &&
-  workflowAllowlist.length > 0 &&
-  !workflowAllowlist.includes(workflowName)
+  context.eventName === "workflow_run" &&
+  context.workflowAllowlist.length > 0 &&
+  !context.workflowAllowlist.includes(context.workflowName)
 ) {
-  console.log(`Skipping Cursor autofix for workflow "${workflowName}".`);
-  console.log(`Allowed workflows: ${workflowAllowlist.join(", ")}`);
+  console.log(`Skipping Cursor autofix for workflow "${context.workflowName}".`);
+  console.log(`Allowed workflows: ${context.workflowAllowlist.join(", ")}`);
   process.exit(0);
 }
 
@@ -60,16 +68,16 @@ const verificationGuidance = [
   "Run the smallest relevant verification command(s) after applying the fix.",
 ];
 
-const prompt = `A GitHub Actions workflow failed for ${repository}.
+const prompt = `A GitHub Actions workflow failed for ${context.repository}.
 
 Context:
-- Event: ${githubEventName}
-- Failed workflow: ${workflowName}
-- Workflow conclusion: ${workflowConclusion}
-- Ref: ${failedBranch}
-- SHA: ${failedRef}
-- Failed workflow run: ${workflowUrl}
-${prUrl ? `- Pull request: ${prUrl}` : "- Pull request: none; create a new fix PR"}
+- Event: ${context.eventName}
+- Failed workflow: ${context.workflowName}
+- Workflow conclusion: ${context.workflowConclusion}
+- Ref: ${context.failedBranch}
+- SHA: ${context.failedRef}
+- Failed workflow run: ${context.workflowUrl}
+${context.prUrl ? `- Pull request: ${context.prUrl}` : "- Pull request: none; create a new fix PR"}
 
 Please inspect the failed workflow run, reproduce the failing command if possible, and fix the underlying code issue.
 
@@ -80,12 +88,12 @@ Requirements:
 - Keep the fix focused on the failing workflow.
 - Do not make unrelated refactors.
 - If the failure is caused by unavailable infrastructure or credentials rather than code, document that clearly instead of fabricating a code fix.
-${prUrl ? "- Push the fix back to the pull request branch if you have permission." : "- Commit the fix, push a branch, and open a pull request."}
+${context.prUrl ? "- Push the fix back to the pull request branch if you have permission." : "- Commit the fix, push a branch, and open a pull request."}
 - Include the verification results in your final response.`;
 
-if (dryRun) {
+if (context.dryRun) {
   console.log("Cursor autofix dry run");
-  console.log(JSON.stringify({ repoConfig, workflowUrl }, null, 2));
+  console.log(JSON.stringify({ repoConfig, workflowUrl: context.workflowUrl }, null, 2));
   console.log(prompt);
   process.exit(0);
 }
@@ -102,9 +110,9 @@ const agent = Agent.create({
 
 try {
   console.log("Starting Cursor Cloud Agent autofix run...");
-  console.log(`Repository: ${repoUrl}`);
-  console.log(`Target: ${prUrl ?? githubSha}`);
-  console.log(`Workflow: ${workflowUrl}`);
+  console.log(`Repository: ${context.repoUrl}`);
+  console.log(`Target: ${context.prUrl ?? context.failedRef}`);
+  console.log(`Workflow: ${context.workflowUrl}`);
 
   const run = await agent.send(prompt);
 
