@@ -9,5 +9,5 @@
     "target": "ES2022",
     "types": ["bun-types"]
   },
-  "include": [".github/scripts/**/*.ts", "tests/**/*.ts"]
+  "include": [".github/scripts/**/*.ts"]
 }

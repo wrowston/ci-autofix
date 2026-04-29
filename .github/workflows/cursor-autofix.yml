@@ -1,0 +1,80 @@
+name: Cursor Autofix
+
+on:
+  workflow_run:
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      workflow_url:
+        description: "Failed GitHub Actions run URL"
+        required: false
+        type: string
+      pr_url:
+        description: "Pull request URL to update, if applicable"
+        required: false
+        type: string
+      ref:
+        description: "Commit SHA or branch to inspect"
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  cursor-autofix:
+    name: Cursor autofix
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        (
+          github.event_name == 'workflow_dispatch'
+        ) ||
+        (
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'failure' &&
+          github.event.workflow_run.name != github.workflow &&
+          !startsWith(github.event.workflow_run.head_branch, 'cursor/') &&
+          (
+            github.event.workflow_run.event != 'pull_request' ||
+            github.event.workflow_run.head_repository.full_name == github.repository
+          )
+        )
+      }}
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Start Cursor Cloud Agent
+        run: bun .github/scripts/cursor-autofix.ts
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          CURSOR_MODEL: ${{ vars.CURSOR_MODEL || 'composer-2' }}
+          CURSOR_AUTOFIX_WORKFLOWS: ${{ vars.CURSOR_AUTOFIX_WORKFLOWS || '' }}
+          WORKFLOW_URL: ${{ github.event.workflow_run.html_url || inputs.workflow_url || '' }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name || '' }}
+          WORKFLOW_CONCLUSION: ${{ github.event.workflow_run.conclusion || '' }}
+          FAILED_REF: ${{ github.event.workflow_run.head_sha || inputs.ref || github.sha }}
+          FAILED_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+          PR_URL: ${{ github.event.workflow_run.pull_requests[0].html_url || inputs.pr_url || '' }}

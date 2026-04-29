@@ -15,6 +15,12 @@ const optionalEnv = (name: string) => {
   return value && value.trim().length > 0 ? value : undefined;
 };
 
+const splitList = (value: string | undefined) =>
+  (value ?? "")
+    .split(/[,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
 const formatList = (items: string[]) => items.map((item) => `- ${item}`).join("\n");
 
 const repository = requiredEnv("GITHUB_REPOSITORY");
@@ -23,34 +29,55 @@ const githubRunId = requiredEnv("GITHUB_RUN_ID");
 const githubRunAttempt = optionalEnv("GITHUB_RUN_ATTEMPT") ?? "1";
 const githubRefName = optionalEnv("GITHUB_REF_NAME") ?? "unknown";
 const githubEventName = optionalEnv("GITHUB_EVENT_NAME") ?? "unknown";
+const failedRef = optionalEnv("FAILED_REF") ?? githubSha;
+const failedBranch = optionalEnv("FAILED_BRANCH") ?? githubRefName;
+const workflowName = optionalEnv("WORKFLOW_NAME") ?? "manual dispatch";
+const workflowConclusion = optionalEnv("WORKFLOW_CONCLUSION") ?? "unknown";
+const workflowAllowlist = splitList(optionalEnv("CURSOR_AUTOFIX_WORKFLOWS"));
 const prUrl = optionalEnv("PR_URL");
-const workflowUrl = `https://github.com/${repository}/actions/runs/${githubRunId}/attempts/${githubRunAttempt}`;
+const currentWorkflowUrl = `https://github.com/${repository}/actions/runs/${githubRunId}/attempts/${githubRunAttempt}`;
+const workflowUrl = optionalEnv("WORKFLOW_URL") ?? currentWorkflowUrl;
 const repoUrl = `https://github.com/${repository}`;
 const dryRun = optionalEnv("CURSOR_AUTOFIX_DRY_RUN") === "true";
 
 const repoConfig = prUrl
   ? { url: repoUrl, prUrl }
-  : { url: repoUrl, startingRef: githubSha };
+  : { url: repoUrl, startingRef: failedRef };
 
-const verificationCommands = ["bun install --frozen-lockfile", "bun test", "bun run build"];
+if (
+  githubEventName === "workflow_run" &&
+  workflowAllowlist.length > 0 &&
+  !workflowAllowlist.includes(workflowName)
+) {
+  console.log(`Skipping Cursor autofix for workflow "${workflowName}".`);
+  console.log(`Allowed workflows: ${workflowAllowlist.join(", ")}`);
+  process.exit(0);
+}
 
-const prompt = `The GitHub Actions CI workflow failed for ${repository}.
+const verificationGuidance = [
+  "Inspect the failed GitHub Actions run and identify the failing command(s).",
+  "Reproduce the failure locally when possible.",
+  "Run the smallest relevant verification command(s) after applying the fix.",
+];
+
+const prompt = `A GitHub Actions workflow failed for ${repository}.
 
 Context:
 - Event: ${githubEventName}
-- Ref: ${githubRefName}
-- SHA: ${githubSha}
+- Failed workflow: ${workflowName}
+- Workflow conclusion: ${workflowConclusion}
+- Ref: ${failedBranch}
+- SHA: ${failedRef}
 - Failed workflow run: ${workflowUrl}
 ${prUrl ? `- Pull request: ${prUrl}` : "- Pull request: none; create a new fix PR"}
 
-Please inspect the failure, reproduce it, and fix the underlying code issue.
+Please inspect the failed workflow run, reproduce the failing command if possible, and fix the underlying code issue.
 
-Verification commands:
-${formatList(verificationCommands)}
+Verification guidance:
+${formatList(verificationGuidance)}
 
 Requirements:
-- Run the verification commands before finishing.
-- Keep the fix focused on the CI failure.
+- Keep the fix focused on the failing workflow.
 - Do not make unrelated refactors.
 - If the failure is caused by unavailable infrastructure or credentials rather than code, document that clearly instead of fabricating a code fix.
 ${prUrl ? "- Push the fix back to the pull request branch if you have permission." : "- Commit the fix, push a branch, and open a pull request."}

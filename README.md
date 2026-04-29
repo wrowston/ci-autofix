@@ -1,26 +1,38 @@
-# CI Autofix
+# Cursor CI Autofix
 
-This repository includes a GitHub Actions CI workflow with an optional Cursor Cloud Agent autofix job.
+This repository is a small GitHub Actions listener that starts a Cursor Cloud Agent when one of your existing CI/CD workflows fails.
+
+It does not define its own test or build pipeline. Your repository keeps its existing GitHub Actions workflows, and this listener reacts to their failures.
 
 ## Setup
 
-Add the following repository secret:
+Copy these files into the repository you want Cursor to autofix:
+
+- `.github/workflows/cursor-autofix.yml`
+- `.github/scripts/cursor-autofix.ts`
+
+Then add the script dependencies:
+
+```sh
+bun add -d @cursor/february typescript @types/bun
+```
+
+Then add this repository secret:
 
 - `CURSOR_API_KEY`: API key used to start Cursor Cloud Agent runs.
 
-Optionally add this repository variable:
+Optionally add these repository variables:
 
 - `CURSOR_MODEL`: Cursor model ID to use for autofix runs. Defaults to `composer-2`.
+- `CURSOR_AUTOFIX_WORKFLOWS`: comma-separated list of workflow names to autofix, for example `CI,Deploy`. Leave unset to listen to every failed workflow except the autofix workflow itself.
 
-The autofix job runs only after the normal CI job fails. It starts a Cursor Cloud Agent that inspects the failed workflow run, reproduces the failure, applies a focused fix, verifies the result, and opens or updates a pull request.
+The workflow names must match the `name:` field in your existing GitHub Actions files:
 
-## Safety Guards
+```yaml
+name: CI
+```
 
-Forked pull requests are intentionally ignored because GitHub does not expose repository secrets to untrusted fork workflows.
-
-Branches beginning with `cursor/` are ignored to prevent autofix loops from Cursor-created fix branches.
-
-Manual dispatch is supported through the `workflow_dispatch` input, but the autofix job only starts when `cursor_autofix=true` and the normal CI job fails.
+When a matching workflow fails, the listener starts a Cursor Cloud Agent with the failed run URL, branch, commit SHA, and pull request URL when GitHub provides one. The agent inspects the failed workflow, fixes the underlying code issue, verifies the relevant commands, and opens or updates a pull request.
 
 ## Dry Run
 
@@ -34,5 +46,10 @@ GITHUB_RUN_ID=123 \
 GITHUB_RUN_ATTEMPT=1 \
 GITHUB_REF_NAME=main \
 GITHUB_EVENT_NAME=workflow_dispatch \
+WORKFLOW_URL=https://github.com/owner/repo/actions/runs/123 \
+WORKFLOW_NAME=CI \
+FAILED_REF=0000000000000000000000000000000000000000 \
+FAILED_BRANCH=main \
 bun .github/scripts/cursor-autofix.ts
 ```
+
