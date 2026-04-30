@@ -33,7 +33,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    uses: rowston/ci-autofix/.github/workflows/cursor-autofix.yml@main
+    uses: wrowston/ci-autofix/.github/workflows/cursor-autofix.yml@main
     secrets:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
 ```
@@ -65,7 +65,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    uses: rowston/ci-autofix/.github/workflows/cursor-autofix.yml@main
+    uses: wrowston/ci-autofix/.github/workflows/cursor-autofix.yml@main
     secrets:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
 ```
@@ -88,7 +88,7 @@ The reusable workflow accepts these optional inputs:
 - `ref`: commit SHA or branch to inspect. Defaults to the current commit SHA.
 - `branch`: branch that contains the failed workflow run. Defaults to the current ref name.
 - `dry_run`: print the generated agent prompt without calling the Cursor API.
-- `autofix_ref`: ref of `rowston/ci-autofix` to use for the autofix implementation. Defaults to `main`.
+- `autofix_ref`: ref of `wrowston/ci-autofix` to use for the autofix implementation. Defaults to `main`.
 
 Example with optional inputs:
 
@@ -99,7 +99,7 @@ cursor-autofix:
   permissions:
     contents: read
     pull-requests: read
-  uses: rowston/ci-autofix/.github/workflows/cursor-autofix.yml@main
+  uses: wrowston/ci-autofix/.github/workflows/cursor-autofix.yml@main
   secrets:
     CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
   with:

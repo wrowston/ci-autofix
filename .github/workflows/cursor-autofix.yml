@@ -38,7 +38,7 @@ on:
         type: boolean
         default: false
       autofix_ref:
-        description: "Ref of rowston/ci-autofix to use for the autofix implementation"
+        description: "Ref of wrowston/ci-autofix to use for the autofix implementation"
         required: false
         type: string
         default: main
@@ -96,7 +96,7 @@ jobs:
       - name: Checkout autofix implementation
         uses: actions/checkout@v4
         with:
-          repository: rowston/ci-autofix
+          repository: wrowston/ci-autofix
           ref: ${{ inputs.autofix_ref || 'main' }}
           path: .cursor-autofix
 
