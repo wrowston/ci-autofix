@@ -113,13 +113,18 @@ The workflow names must match the `name:` field in your existing GitHub Actions 
 
 ## Listener Mode
 
-This repository also supports listener mode for repositories that prefer a standalone workflow that reacts to failed workflow runs. In that mode, copy `.github/workflows/cursor-autofix.yml` into the target repository and keep using:
+Repositories that prefer a standalone workflow that reacts to failed workflow runs can copy `examples/cursor-autofix-listener.yml` into their own `.github/workflows/` directory.
+
+Listener workflows must name the workflows they watch:
 
 ```yaml
 on:
   workflow_run:
+    workflows: ["CI"]
     types: [completed]
 ```
+
+Update `workflows` to match the `name:` fields of the workflows Cursor should autofix.
 
 Reusable workflow mode is recommended when you want to plug autofix directly into an existing CI, test, or build pipeline.
 

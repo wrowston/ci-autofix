@@ -45,8 +45,6 @@ on:
     secrets:
       CURSOR_API_KEY:
         required: true
-  workflow_run:
-    types: [completed]
   workflow_dispatch:
     inputs:
       workflow_url:
