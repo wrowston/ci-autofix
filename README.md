@@ -4,6 +4,39 @@ This repository provides a reusable GitHub Actions workflow that starts a Cursor
 
 It does not define its own test or build pipeline. Your repository keeps its existing GitHub Actions workflows, and adds one `cursor-autofix` job that runs only when those jobs fail.
 
+## Agent Prompt
+
+Copy this prompt into Cursor, or give it to any coding agent, from the repository where you want CI autofix installed:
+
+```text
+Implement Cursor CI autofix in this repository.
+
+Goal:
+- When an existing GitHub Actions CI, test, lint, build, or deploy workflow fails, start a Cursor Cloud Agent to inspect the failed run and open or update a fix PR.
+- Do not replace the existing CI/CD workflow. Add autofix behavior around it.
+
+Tasks:
+1. Inspect `.github/workflows` and identify the workflows and jobs that represent CI, tests, linting, typechecking, builds, or deploy checks.
+2. Prefer adding a final `cursor-autofix` job to each existing workflow that should be watched.
+3. Set the `cursor-autofix` job to:
+   - depend on every job it should watch with `needs`
+   - run only on failure with `if: ${{ failure() }}`
+   - request `contents: read` and `pull-requests: read` permissions
+   - call `wrowston/ci-autofix/.github/workflows/cursor-autofix.yml@main`
+   - pass `CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}`
+4. If an existing workflow cannot be edited cleanly, add a separate listener workflow based on `https://raw.githubusercontent.com/wrowston/ci-autofix/main/examples/cursor-autofix-listener.yml` and set `workflow_run.workflows` to the exact `name:` values of the workflows to watch.
+5. Preserve all existing workflow behavior, branch filters, triggers, permissions, matrices, caches, and deploy gates.
+6. Update repository documentation, if appropriate, to say that maintainers must add a `CURSOR_API_KEY` repository secret.
+7. Validate the workflow YAML and run the smallest relevant local checks available in the repo.
+
+Requirements:
+- Keep the change focused on CI autofix only.
+- Do not add a new test/build pipeline unless the repository does not already have one and the user explicitly asked for it.
+- Do not trigger autofix from branches named `cursor/*` if you use listener mode.
+- For pull requests from forks, avoid configurations that require unavailable secrets.
+- In your final response, summarize the workflow files changed, what failures are watched, and what validation you ran.
+```
+
 ## Setup
 
 First, add this repository secret to the repository where you want Cursor to fix CI failures:
