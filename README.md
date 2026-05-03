@@ -6,11 +6,17 @@ It does not define its own test or build pipeline. Your repository keeps its exi
 
 ## Setup
 
-Add this repository secret:
+First, add this repository secret to the repository where you want Cursor to fix CI failures:
 
 - `CURSOR_API_KEY`: API key used to start Cursor Cloud Agent runs.
 
-Then add a final job to any workflow you want Cursor to autofix:
+Then choose one setup mode.
+
+### Recommended: Add A Reusable Autofix Job
+
+Use this mode when you already have a CI, test, build, or deploy workflow and want Cursor to run only when one of that workflow's jobs fails.
+
+In each workflow you want Cursor to autofix, add a final `cursor-autofix` job:
 
 ```yaml
 name: CI
@@ -39,6 +45,8 @@ jobs:
 ```
 
 When `test` fails, GitHub calls the reusable workflow from this repository. The reusable workflow starts a Cursor Cloud Agent with the failed run URL, branch, commit SHA, and pull request URL when one is provided.
+
+The workflow can be named anything. It does not need to be named `CI`; that is only the example workflow name.
 
 For workflows with multiple jobs, list every job Cursor should watch in `needs`:
 
@@ -113,9 +121,17 @@ The workflow names must match the `name:` field in your existing GitHub Actions 
 
 ## Listener Mode
 
-Repositories that prefer a standalone workflow that reacts to failed workflow runs can copy `examples/cursor-autofix-listener.yml` into their own `.github/workflows/` directory.
+Use this mode when you want a separate workflow file that listens for another workflow to fail.
 
-Listener workflows must name the workflows they watch:
+Copy `examples/cursor-autofix-listener.yml` into the target repository:
+
+```sh
+mkdir -p .github/workflows
+curl -fsSL https://raw.githubusercontent.com/wrowston/ci-autofix/main/examples/cursor-autofix-listener.yml \
+  -o .github/workflows/cursor-autofix-listener.yml
+```
+
+Then edit the copied file so `workflows` matches the `name:` field of the workflow Cursor should watch:
 
 ```yaml
 on:
@@ -124,7 +140,25 @@ on:
     types: [completed]
 ```
 
-Update `workflows` to match the `name:` fields of the workflows Cursor should autofix.
+For example, if your existing workflow starts with `name: Tests`, use:
+
+```yaml
+on:
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
+```
+
+To watch multiple workflows, list each workflow name:
+
+```yaml
+on:
+  workflow_run:
+    workflows: ["CI", "Deploy"]
+    types: [completed]
+```
+
+GitHub requires `workflow_run.workflows`; a listener cannot watch every workflow without naming them. If you leave the template unchanged, it watches a workflow named `CI`.
 
 Reusable workflow mode is recommended when you want to plug autofix directly into an existing CI, test, or build pipeline.
 

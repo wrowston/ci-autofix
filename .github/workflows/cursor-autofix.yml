@@ -51,6 +51,10 @@ on:
         description: "Failed GitHub Actions run URL"
         required: false
         type: string
+      workflow_name:
+        description: "Name of the workflow that failed"
+        required: false
+        type: string
       pr_url:
         description: "Pull request URL to update, if applicable"
         required: false
@@ -63,6 +67,25 @@ on:
         description: "Branch that contains the failed workflow run"
         required: false
         type: string
+      model:
+        description: "Cursor model ID to use for autofix runs"
+        required: false
+        type: string
+        default: composer-2
+      workflows:
+        description: "Comma-separated workflow names to autofix"
+        required: false
+        type: string
+      dry_run:
+        description: "Print the generated prompt without calling the Cursor API"
+        required: false
+        type: boolean
+        default: false
+      autofix_ref:
+        description: "Ref of wrowston/ci-autofix to use for the autofix implementation"
+        required: false
+        type: string
+        default: main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.workflow_run.id || github.run_id }}
